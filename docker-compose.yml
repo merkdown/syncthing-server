@@ -1,0 +1,55 @@
+version: "3"
+
+services:
+  syncthing:
+    image: syncthing/syncthing
+    container_name: syncthing
+    hostname: syncthing
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - /opt/syncthing:/var/syncthing
+    ports:
+      - 22000:22000/tcp 
+      - 22000:22000/udp 
+      - 21027:21027/udp
+    restart: always
+    networks:
+      syncthing:
+        ipv4_address: 10.50.46.20
+
+  nginx:
+    image: nginx:1.15-alpine
+    hostname: nginx
+    restart: always
+    volumes:
+      - ./data/nginx:/etc/nginx/conf.d
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      syncthing:
+        ipv4_address: 10.50.46.21
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+
+  certbot:
+    image: certbot/certbot
+    restart: always
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    networks:
+      syncthing:
+        ipv4_address: 10.50.46.22
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+networks:
+  syncthing:
+    driver: bridge
+    ipam:
+     config:
+       - subnet: 10.50.46.0/24
+         gateway: 10.50.46.1
